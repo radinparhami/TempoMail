@@ -1,10 +1,12 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
 setup(
     name='TempoMail',
-    packages=find_packages(include=['TempoMail']),
-    version='1.0.0',
+    version='1.0.2',
     description='python temp-mail liberary',
     author='Radin',
+    download_url="https://github.com/radinparhami/TempoMail/releases/latest",
+    url="https://github.com/radinparhami",
+    author_email="radinparhami107@gmail.com",
     install_requires=['requests'],
 )
