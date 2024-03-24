@@ -34,5 +34,5 @@ core.delete_account()
 ### Installing
 
 ``` bash
-pip3 install pyrogram
+pip install TempoMail
 ```
