@@ -1,13 +1,7 @@
 # TempoMail
-python temp-mail liberary
 
-### Installing
+> python temp-mail liberary
 
-``` bash
-pip3 install pyrogram
-```
-
-### Example of creating and receiving email using TempoMail:
 ```python
 from time import sleep
 
@@ -35,5 +29,10 @@ while True:
 
 # It's better to delete the user account after using it.
 core.delete_account()
+```
 
+### Installing
+
+``` bash
+pip3 install pyrogram
 ```
