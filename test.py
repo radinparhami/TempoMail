@@ -15,10 +15,9 @@ first_msg = None
 while not first_msg:
     sleep(1)
     messages = core.get_messages()
-    if core.get_messages():
-        for message in messages:
-            print(f"Subject: {message.subject}, text: {message.text}")
-            first_msg = message  # It continues until a new message is received
+    for message in messages:
+        print(f"Subject: {message.subject}, text: {message.text}")
+        first_msg = message  # It continues until a new message is received
 
 # It's better to delete the user account after using it.
 core.delete_account()
