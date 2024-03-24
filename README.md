@@ -1,6 +1,9 @@
 # TempoMail
 python temp-mail liberary
 
+## for install
+`pip install TempoMail`
+
 ## Example of creating and receiving email using TempoMail:
 ```python
 from time import sleep
