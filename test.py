@@ -3,7 +3,9 @@ from time import sleep
 
 # Use username and password if desired, otherwise: randomly generated.
 core = TempoMail(username=None, password=None)  # set temp-mail information.
-core.create(), core.authorize()  # Create and Login to the temp-mail.
+# Create and Login to the temp-mail.
+core.create()
+core.authorize()
 
 mail = core.get_account_info()  # get temp-mail information
 
