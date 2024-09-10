@@ -1,29 +1,28 @@
 # TEMP-MAIL
 # base reference: https://docs.mail.tm/
 
-from typing import List
 
+from .core import MailCenter
 from .types import Account, Message
-from .core import Mail, __send_request__
 
 
-class TempoMail(Mail):
-    def get_messages(self, page: int = 1) -> List[Message]:
-        result = __send_request__(
-            "messages", args=dict(page=page),
-            head=self.auth_head_gen
+class TempMail(MailCenter):
+    async def get_messages(self, page: int = 1):
+        _, result = await self._send_request(
+            f"/messages?page={page}", head=self.authenticate
         )
-        for msg_data in result.get("hydra:member"):
+        for msg_data in result.get(self._MASTER_KEY, []):
             # recover the full message
-            msg_result: Message = Message(__send_request__(
-                ["messages", msg_data['id']],
-                head=self.auth_head_gen
-            ))
+            _, result = await self._send_request(
+                ["/messages", msg_data["id"]], head=self.authenticate
+            )
 
-            yield msg_result
+            yield Message(result)
 
-    def get_account_info(self) -> Account:
-        return Account(self.__action__())
+    async def get_me(self) -> Account:
+        _, result = await self._action("GET")
+        return Account(result)
 
-    def delete_account(self) -> bool:
-        return self.__action__("DELETE")
+    async def delete(self):
+        status, _ = await self._action("GET")
+        return status == 204

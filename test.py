@@ -1,25 +1,32 @@
-from TempoMail.client import TempoMail
-from time import sleep
+import asyncio
 
-# Use username and password if desired, otherwise: randomly generated.
-core = TempoMail(username=None, password=None)  # set temp-mail information.
-# Create and Login to the temp-mail.
-core.create()
-core.authorize()
+from TempoMail import RandomText, TempMail
 
-mail = core.get_account_info()  # get temp-mail information
 
-print(mail)
-print(f"\n\nYour Temp-Mail: {mail.address}\n\n")
-print("Wait for new message ...")
+async def main():
+    username = RandomText(10)
+    password = RandomText(8)
+    # Use username and password if desired, otherwise: randomly generated.
+    account = TempMail()  # set temp-mail information.
+    async with account.session:
+        # Create and Login to the temp-mail.
+        domain = await account.get_domains_list()
+        await account.login(username, password, domain)
 
-first_msg = None
-while not first_msg:
-    sleep(1)
-    messages = core.get_messages()
-    for message in messages:
-        print(f"Subject: {message.subject}, text: {message.text}")
-        first_msg = message  # It continues until a new message is received
+        mail = await account.get_me()  # get temp-mail information
 
-# It's better to delete the user account after using it.
-core.delete_account()
+        print(f"Your Temp-Mail: {mail.address}\n\nWait for new message ...\n")
+
+        without_msg = True
+        while without_msg:
+            async for message in account.get_messages():
+                print(f"Subject: {message.subject}, text: {message.text}")
+                without_msg = False  # break when first-message received
+
+        # It's better to delete the user account after using it.
+        await account.delete()
+
+
+if __name__ == "__main__":
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(main())

@@ -2,96 +2,142 @@
 # base reference: https://docs.mail.tm/
 
 from json import dumps
-from pprint import pprint
-from random import choices, choice
+from random import choice, choices
 from string import ascii_lowercase, digits
-from typing import Union, List
+from typing import Dict, List, Tuple, Union
 
-import requests
+from aiohttp import ClientSession
 
 from .types import Token
 
-api_address = "https://api.mail.tm/"
-chars = ascii_lowercase + digits + "._"
-generate_chars = (lambda length: ''.join(choices(chars, k=length)))
+
+class RandomText:
+    _chars = ascii_lowercase + digits + "_"
+
+    def __init__(self, length: int) -> None:
+        self.length = length
+
+    def generate(self) -> str:
+        return "".join(choices(self._chars, k=self.length))
 
 
-def __send_request__(
-        end_point: Union[List[str], str], method: str = "GET",
-        head: dict = None, args: dict = None, data: dict = None,
-        except_status_codes: Union[List[int], int] = None,
-) -> Union[requests.Response, int, False]:
-    end_points: str = end_point if not isinstance(end_point, list) else "/".join(end_point)
-    url = api_address + (end_points[1:] if end_points.startswith("/") else end_points)
-    except_status_codes = except_status_codes if isinstance(except_status_codes, list) else [except_status_codes]
-    if args:
-        url += '?' + '&'.join([f'{k}={v}' for k, v in args.items()])
-    headers = {
+class MailCenter:
+    _API_ADDRESS: str = "https://api.mail.tm"
+    _HEADERS: Dict[str, str] = {
         "accept": "application/ld+json",
         "Content-Type": "application/json",
     }
-    response = requests.request(
-        method=method.lower(), url=url,
-        headers={**headers, **head} if head else headers,
-        data=data and dumps(data),
-    )
-    if response.status_code not in (200, 201, *except_status_codes):
-        print(f"Error {response.status_code}:")
-        pprint(response.json())
-        return False
+    _MASTER_KEY: str = "hydra:member"
 
-    return response.text and response.json() or response.status_code
+    def __init__(
+        self,
+        session: Union[ClientSession, None] = None,
+    ):
+        self.session = session or ClientSession()
+        self._token_info: Union[Token, None] = None
 
-
-class Mail:
-    def __init__(self, username: str = None, password: str = None, domain: str = None):
-        self.username = username or generate_chars(16)
-        self.password = password or generate_chars(6)
-        self.domain = domain or choice(self.get_domains_list)
-
-        self.token_info = None
-
-        self.email_address = "{username}@{domain}".format(
-            username=self.username,
-            domain=self.domain
+    async def _send_request(
+        self,
+        end_point: Union[List[str], str],
+        method: str = "GET",
+        head: Union[dict, None] = None,
+        data: Union[dict, None] = None,
+    ) -> Tuple[int, dict]:
+        end_points: str = "/".join(
+            [end_point]
+            if isinstance(
+                end_point,
+                str,
+            )
+            else end_point
         )
 
-    @property
-    def get_domains_list(self) -> Union[List[str], None]:
-        result = __send_request__('domains')
-        if result and result.get("hydra:member"):
-            return list(map(lambda x: x["domain"], result["hydra:member"]))
+        response = await self.session.request(
+            method=method.lower(),
+            url=self._API_ADDRESS + end_points,
+            # add customize headers
+            headers={**self._HEADERS, **head} if head else self._HEADERS,
+            data=data and dumps(data),
+        )
+        if response.status not in [200, 201, 204]:
+            # print(f"Error {response.status_code}:")
+            # pprint(response.json())
+            return response.status, {}
+        elif response.method == "DELETE":
+            return response.status, {}
 
-    def create(self, end_point: str = "accounts") -> Union[dict, None]:
-        return __send_request__(
-            end_point=end_point, method="POST",
+        return response.status, await response.json()
+
+    async def get_domains_list(self) -> List[str]:
+        _, result = await self._send_request("/domains")
+        if result.get(self._MASTER_KEY):
+            return list(map(lambda x: x["domain"], result[self._MASTER_KEY]))
+        else:
+            print("ERROR to find domain!")
+            exit()
+
+    async def _create(self, end_point: str):
+        return await self._send_request(
+            end_point=end_point,
+            method="POST",
             data=dict(
                 address=self.email_address,
                 password=self.password,
-            )
+            ),
         )
 
-    def authorize(self):
-        self.token_info: Token = Token(self.token_info or self.create(end_point="token"))
+    async def login(
+        self,
+        username: Union[str, RandomText],
+        password: Union[str, RandomText],
+        domain: Union[str, List[str]],
+    ):
+        if isinstance(username, RandomText):
+            username = username.generate()
+        if isinstance(password, RandomText):
+            password = password.generate()
+        if isinstance(domain, list):  # select randomly
+            domain = choice(domain)
+
+        self.username: str = username
+        self.password: str = password
+        self.domain: str = domain
+        self.email_address = "{username}@{domain}".format(
+            username=self.username, domain=self.domain
+        )
+        await self._create(end_point="/accounts")  # Create Account
+
+        if self._token_info is None:
+            status, result = await self._create(end_point="/token")
+            self._token_info = Token(result)
+            if status == 401:
+                print(
+                    f"username: {username} is invalid! (remove dot or unknown characters from username)"
+                )
+                exit()
+
+        return self._token_info
 
     @property
     def token(self) -> Token:
-        if self.token_info:
-            return self.token_info
-        print("ERROR you must login first! Use `authorize` method."), exit()
+        if not self._token_info:
+            print("ERROR you must login first! Use `login` method.")
+            exit()
+        return self._token_info
 
     @property
-    def auth_head_gen(self):
-        return dict(Authorization=f"Bearer {self.token.token}")
+    def authenticate(self):
+        return {"Authorization": f"Bearer {self.token.token}"}
 
-    def __action__(self, action: str = "get") -> Union[bool, dict]:
-        if not action.lower() in ["get", "delete"]:
+    async def _action(self, action) -> Tuple[int, dict]:
+        if action.upper() not in ["GET", "DELETE"]:
             print("ERROR: invalid action")
-            return False
-        is_delete = action.lower() == "delete"
-        result: dict = __send_request__(
-            end_point=self.token.at_id, method=action,
-            head=self.auth_head_gen, except_status_codes=[204, 401]
+            return (500, {})
+
+        status, result = await self._send_request(
+            end_point=self.token.at_id,
+            method=action,
+            head=self.authenticate,
         )
 
-        return is_delete and 204 == result or result
+        return status, result
