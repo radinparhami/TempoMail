@@ -1,4 +1,5 @@
-# TempoMail is a asynchronous library to get temporary E-mails.
+## TempoMail
+> asynchronous library to get temporary E-mails.
 
 > Example:
 
