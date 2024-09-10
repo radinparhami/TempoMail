@@ -1,8 +1,7 @@
 ## TempoMail
 > asynchronous library to get temporary E-mails.
 
-> Example:
-
+## Example:
 ```python
 import asyncio
 
@@ -39,7 +38,6 @@ if __name__ == "__main__":
 ```
 
 ### Installing
-
 ```bash
 pip install TempoMail
 ```
